@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>DNS Stats</title>
+        <style>
+            body {
+                font-family: monospace;
+                padding: 20px;
+                background-color: #f4f4f4;
+            }
+            pre {
+                background-color: #fff;
+                padding: 10px;
+                border: 1px solid #ccc;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Real-Time DNS Stats</h2>
+        <pre id="stats">Loading...</pre>
+
+        <p>
+            <a href="/">Back to DNS Zone Editor</a>
+        </p>
+
+        <script>
+            async function updateStats() {
+                const res = await fetch("/stats/data");
+                const data = await res.json();
+                document.getElementById("stats").textContent = JSON.stringify(
+                    data,
+                    null,
+                    2
+                );
+            }
+
+            setInterval(updateStats, 1000);
+            updateStats();
+        </script>
+    </body>
+</html>

@@ -1,8 +1,11 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 import json
+import os
+from dns_server import stats
 
 app = Flask(__name__)
 ZONE_FILE = 'zones.json'
+STATS_FILE = 'stats.json'
 
 # Load zones from the JSON file
 def load_zones():
@@ -58,6 +61,21 @@ def delete_record(domain, record_type):
         save_zones(zones)
 
     return redirect('/')
+
+# Show stats page
+@app.route('/stats')
+def stats_page():
+    return render_template('stats.html')
+
+# Serve stats data as JSON for JavaScript
+@app.route('/stats/data')
+def stats_data():
+    if os.path.exists(STATS_FILE):
+        with open(STATS_FILE) as f:
+            stats = json.load(f)
+    else:
+        stats = {"total": 0, "domains": {}, "types": {}}
+    return jsonify(stats)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
