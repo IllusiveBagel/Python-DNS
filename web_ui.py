@@ -4,19 +4,23 @@ import json
 app = Flask(__name__)
 ZONE_FILE = 'zones.json'
 
+# Load zones from the JSON file
 def load_zones():
     with open(ZONE_FILE) as f:
         return json.load(f)
 
+# Save zones to the JSON file
 def save_zones(zones):
     with open(ZONE_FILE, 'w') as f:
         json.dump(zones, f, indent=4)
 
+# Index route to display the DNS records
 @app.route('/')
 def index():
     zones = load_zones()
     return render_template('index.html', zones=zones)
 
+# Add a new DNS record
 @app.route('/add', methods=['POST'])
 def add_record():
     domain = request.form['domain'].strip('.')
@@ -41,6 +45,7 @@ def add_record():
     save_zones(zones)
     return redirect('/')
 
+# Delete a DNS record
 @app.route('/delete/<domain>/<record_type>')
 def delete_record(domain, record_type):
     domain += '.'
