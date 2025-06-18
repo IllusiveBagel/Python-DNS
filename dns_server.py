@@ -3,12 +3,15 @@ import struct
 import json
 import time
 
+# Zone Constants
 ZONE_FILE = 'zones.json'
 ZONES = {}
 
+# DNS Constants
 TYPE = {'A': 1, 'MX': 15, 'TXT': 16, 'AAAA': 28}
 IN = 1
 
+# Load zones from the JSON file
 def load_zones():
     global ZONES
     try:
@@ -18,6 +21,7 @@ def load_zones():
     except Exception as e:
         print(f"[ERROR] Could not load zones: {e}")
 
+# Parse DNS labels and return the full domain name
 def parse_labels(data, offset):
     labels = []
     while True:
@@ -29,13 +33,16 @@ def parse_labels(data, offset):
         offset += 1 + length
     return '.'.join(labels) + '.', offset
 
+# Encode a domain name into DNS format
 def encode_name(name):
     parts = name.strip('.').split('.')
     return b''.join(bytes([len(part)]) + part.encode() for part in parts) + b'\x00'
 
+# Build a resource record for the DNS response
 def build_resource_record(qname, rtype, ttl, rdata_bytes):
     return b'\xc0\x0c' + struct.pack("!HHI", rtype, IN, ttl) + struct.pack("!H", len(rdata_bytes)) + rdata_bytes
 
+# Build a DNS response based on the query
 def build_dns_response(query):
     transaction_id = query[:2]
     domain_name, offset = parse_labels(query, 12)
@@ -84,6 +91,7 @@ def build_dns_response(query):
     flags = b'\x81\x83'  # Standard query response, recursion not available, name error
     return transaction_id + flags + b'\x00\x01' + b'\x00\x00\x00\x00' + query[12:]
 
+# Main function to run the DNS server
 def main():
     load_zones()
     last_reload = time.time()
