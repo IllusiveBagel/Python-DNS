@@ -1,34 +1,82 @@
 from flask import Flask, render_template, request, redirect, jsonify
-import json
-import os
-from dns_server import stats
+import sqlite3
+
+DB_FILE = 'dns.db'
 
 app = Flask(__name__)
-ZONE_FILE = 'zones.json'
-STATS_FILE = 'stats.json'
 
-# Load zones from the JSON file
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS zones (
+            domain TEXT,
+            type TEXT,
+            value TEXT,
+            PRIMARY KEY (domain, type)
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS stats (
+            key TEXT PRIMARY KEY,
+            value INTEGER
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS domain_stats (
+            domain TEXT PRIMARY KEY,
+            count INTEGER
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS type_stats (
+            type TEXT PRIMARY KEY,
+            count INTEGER
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
 def load_zones():
-    with open(ZONE_FILE) as f:
-        return json.load(f)
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT domain, type, value FROM zones")
+    rows = c.fetchall()
+    zones = {}
+    for domain, rtype, value in rows:
+        if domain not in zones:
+            zones[domain] = {}
+        if rtype == 'MX':
+            pref, exchange = value.split(' ', 1)
+            zones[domain][rtype] = {"preference": int(pref), "exchange": exchange}
+        else:
+            zones[domain][rtype] = value
+    conn.close()
+    return zones
 
-# Save zones to the JSON file
 def save_zones(zones):
-    with open(ZONE_FILE, 'w') as f:
-        json.dump(zones, f, indent=4)
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DELETE FROM zones")
+    for domain, records in zones.items():
+        for rtype, value in records.items():
+            if rtype == 'MX':
+                val = f"{value['preference']} {value['exchange']}"
+            else:
+                val = value
+            c.execute("INSERT INTO zones (domain, type, value) VALUES (?, ?, ?)", (domain, rtype, val))
+    conn.commit()
+    conn.close()
 
-# Index route to display the DNS records
 @app.route('/')
 def index():
     zones = load_zones()
     return render_template('index.html', zones=zones)
 
-# Add a new DNS record
 @app.route('/add', methods=['POST'])
 def add_record():
     domain = request.form['domain'].strip('.')
     record_type = request.form['type']
-    value = request.form['value']
 
     zones = load_zones()
     fqdn = domain + '.'
@@ -37,18 +85,19 @@ def add_record():
         zones[fqdn] = {}
 
     if record_type == 'MX':
-        pref, exchange = value.split()
+        pref = request.form['mx_pref']
+        exchange = request.form['mx_exch']
         zones[fqdn]['MX'] = {
             "preference": int(pref),
             "exchange": exchange
         }
     else:
+        value = request.form['value']
         zones[fqdn][record_type] = value
 
     save_zones(zones)
     return redirect('/')
 
-# Delete a DNS record
 @app.route('/delete/<domain>/<record_type>')
 def delete_record(domain, record_type):
     domain += '.'
@@ -62,20 +111,27 @@ def delete_record(domain, record_type):
 
     return redirect('/')
 
-# Show stats page
 @app.route('/stats')
 def stats_page():
     return render_template('stats.html')
 
-# Serve stats data as JSON for JavaScript
 @app.route('/stats/data')
 def stats_data():
-    if os.path.exists(STATS_FILE):
-        with open(STATS_FILE) as f:
-            stats = json.load(f)
-    else:
-        stats = {"total": 0, "domains": {}, "types": {}}
-    return jsonify(stats)
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    # Total
+    c.execute("SELECT value FROM stats WHERE key = 'total'")
+    total = c.fetchone()
+    total = total[0] if total else 0
+    # Domains
+    c.execute("SELECT domain, count FROM domain_stats")
+    domains = dict(c.fetchall())
+    # Types
+    c.execute("SELECT type, count FROM type_stats")
+    types = dict(c.fetchall())
+    conn.close()
+    return jsonify({"total": total, "domains": domains, "types": types})
 
 if __name__ == '__main__':
+    init_db()
     app.run(host='0.0.0.0', port=5000)

@@ -25,6 +25,28 @@
                 padding: 6px;
             }
         </style>
+        <script>
+            function updateValueInput() {
+                var type = document.getElementById("type-select").value;
+                var valueField = document.getElementById("value-field");
+                if (type === "MX") {
+                    valueField.innerHTML = `
+                        <input name="mx_pref" type="number" min="0" required style="width:70px" placeholder="Pref" />
+                        <input name="mx_exch" type="text" required style="width:200px" placeholder="Exchange (host)" />
+                    `;
+                } else {
+                    valueField.innerHTML = `
+                        <input name="value" placeholder="e.g. 1.2.3.4 or text" required />
+                    `;
+                }
+            }
+            window.addEventListener("DOMContentLoaded", function () {
+                document
+                    .getElementById("type-select")
+                    .addEventListener("change", updateValueInput);
+                updateValueInput();
+            });
+        </script>
     </head>
     <body>
         <h1>DNS Zone Editor</h1>
@@ -33,22 +55,19 @@
 
         <form method="POST" action="/add">
             <label>Domain: <input name="domain" required /></label>
-            <label
-                >Type:
-                <select name="type">
+            <label>
+                Type:
+                <select name="type" id="type-select">
                     <option>A</option>
                     <option>AAAA</option>
                     <option>MX</option>
                     <option>TXT</option>
                 </select>
             </label>
-            <label
-                >Value:
-                <input
-                    name="value"
-                    placeholder="e.g. 1.2.3.4 or 10 mail.example.com"
-                    required
-            /></label>
+            <label>
+                Value:
+                <span id="value-field"></span>
+            </label>
             <button type="submit">Add / Update</button>
         </form>
 
